@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Board</title>
+<style>
+  :root {
+    --ground: #F6F3EC;
+    --panel: #FBF9F3;
+    --card: #FFFFFF;
+    --ink: #1F2024;
+    --ink-soft: #3D3E42;
+    --muted: #7A7873;
+    --line: #E4DFD3;
+    --line-strong: #D6D0C0;
+    --shadow: 0 1px 0 rgba(31,32,36,0.03), 0 8px 24px -18px rgba(31,32,36,0.25);
+    --focus: #2E5AA8;
+
+    --c-sm:   #6B8EA8;
+    --c-lg:   #4A5578;
+    --c-ip:   #C4823A;
+    --c-fu:   #A6688E;
+    --c-done: #6D8F6D;
+
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Söhne", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #17181B;
+      --panel: #1D1E22;
+      --card: #22242A;
+      --ink: #ECE9E1;
+      --ink-soft: #C7C4BC;
+      --muted: #8A8880;
+      --line: #2B2D33;
+      --line-strong: #363942;
+      --shadow: 0 1px 0 rgba(0,0,0,0.4), 0 10px 28px -18px rgba(0,0,0,0.65);
+      --focus: #7FA7E4;
+
+      --c-sm:   #8AA9C3;
+      --c-lg:   #7C88AF;
+      --c-ip:   #D69A55;
+      --c-fu:   #C084A8;
+      --c-done: #92B092;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F3EC;
+    --panel: #FBF9F3;
+    --card: #FFFFFF;
+    --ink: #1F2024;
+    --ink-soft: #3D3E42;
+    --muted: #7A7873;
+    --line: #E4DFD3;
+    --line-strong: #D6D0C0;
+    --shadow: 0 1px 0 rgba(31,32,36,0.03), 0 8px 24px -18px rgba(31,32,36,0.25);
+    --focus: #2E5AA8;
+    --c-sm: #6B8EA8;
+    --c-lg: #4A5578;
+    --c-ip: #C4823A;
+    --c-fu: #A6688E;
+    --c-done: #6D8F6D;
+  }
+  :root[data-theme="dark"] {
+    --ground: #17181B;
+    --panel: #1D1E22;
+    --card: #22242A;
+    --ink: #ECE9E1;
+    --ink-soft: #C7C4BC;
+    --muted: #8A8880;
+    --line: #2B2D33;
+    --line-strong: #363942;
+    --shadow: 0 1px 0 rgba(0,0,0,0.4), 0 10px 28px -18px rgba(0,0,0,0.65);
+    --focus: #7FA7E4;
+    --c-sm: #8AA9C3;
+    --c-lg: #7C88AF;
+    --c-ip: #D69A55;
+    --c-fu: #C084A8;
+    --c-done: #92B092;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 20px 24px 24px;
+    gap: 18px;
+  }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .brand .mark {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 3px 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+  }
+  .brand h1 {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 15px;
+    letter-spacing: -0.005em;
+    margin: 0;
+    color: var(--ink);
+  }
+  .brand h1 .sep { color: var(--muted); margin: 0 6px; font-weight: 400; }
+  .brand h1 .subj { color: var(--ink-soft); }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+  .meta .stat b {
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta .divider {
+    width: 1px;
+    height: 14px;
+    background: var(--line-strong);
+  }
+  .meta button {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 4px 9px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .meta button:hover { color: var(--ink); border-color: var(--ink); }
+  .meta button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  main.board {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(240px, 1fr));
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  @media (max-width: 1100px) {
+    main.board { grid-template-columns: repeat(5, 260px); }
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    min-height: 320px;
+    position: relative;
+    overflow: hidden;
+  }
+  .col::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--stripe, var(--muted));
+  }
+  .col[data-col="todo-sm"]   { --stripe: var(--c-sm); }
+  .col[data-col="todo-lg"]   { --stripe: var(--c-lg); }
+  .col[data-col="in-progress"]{ --stripe: var(--c-ip); }
+  .col[data-col="follow-up"] { --stripe: var(--c-fu); }
+  .col[data-col="done"]      { --stripe: var(--c-done); }
+
+  .col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 8px;
+    gap: 8px;
+  }
+  .col-head h2 {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .col-head h2 .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--stripe);
+    display: inline-block;
+  }
+  .col-head .count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    padding: 2px 6px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    min-width: 22px;
+    text-align: center;
+  }
+
+  .col-add {
+    padding: 4px 12px 10px;
+  }
+  .col-add input {
+    width: 100%;
+    background: transparent;
+    border: 1px dashed var(--line-strong);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink);
+    transition: border-color .15s, background .15s;
+  }
+  .col-add input::placeholder {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+  }
+  .col-add input:hover {
+    border-color: var(--stripe);
+  }
+  .col-add input:focus {
+    outline: none;
+    border-style: solid;
+    border-color: var(--stripe);
+    background: var(--card);
+  }
+
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .list.drop-target {
+    background: color-mix(in srgb, var(--stripe) 6%, transparent);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 10px 12px 11px;
+    position: relative;
+    cursor: grab;
+    transition: border-color .12s, transform .12s, box-shadow .12s;
+    box-shadow: 0 1px 0 rgba(31,32,36,0.02);
+  }
+  .card:hover {
+    border-color: var(--line-strong);
+  }
+  .card:active { cursor: grabbing; }
+  .card.dragging {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+
+  .card .text {
+    color: var(--ink);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 13.5px;
+    line-height: 1.4;
+    padding-right: 16px;
+  }
+  .card .text[contenteditable="true"] {
+    outline: none;
+  }
+
+  .card .meta-row {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .card .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .card .tag::before {
+    content: "";
+    width: 5px; height: 5px;
+    background: var(--stripe);
+    border-radius: 50%;
+  }
+
+  .card .del {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    transition: opacity .15s, background .15s, color .15s;
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1;
+  }
+  .card:hover .del,
+  .card:focus-within .del { opacity: 1; }
+  .card .del:hover { background: var(--line); color: var(--ink); }
+
+  .empty {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: 18px 10px 8px;
+    border: 1px dashed transparent;
+    border-radius: 6px;
+  }
+  .list.drop-target .empty { border-color: var(--stripe); color: var(--ink-soft); }
+
+  footer.tips {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  footer.tips kbd {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 5px;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    color: var(--ink-soft);
+    background: var(--panel);
+    margin: 0 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="mark">Kanban</span>
+      <h1><span class="subj">board</span><span class="sep">/</span>today</h1>
+    </div>
+    <div class="meta">
+      <span class="stat"><b id="stat-open">0</b> open</span>
+      <span class="divider"></span>
+      <span class="stat"><b id="stat-progress">0</b> in progress</span>
+      <span class="divider"></span>
+      <span class="stat"><b id="stat-done">0</b> done</span>
+      <span class="divider"></span>
+      <button id="clear-done" title="Remove all cards in Done">clear done</button>
+    </div>
+  </header>
+
+  <main class="board" id="board">
+    <section class="col" data-col="todo-sm">
+      <div class="col-head">
+        <h2><span class="dot"></span>Todo · sm</h2>
+        <span class="count" data-count="todo-sm">0</span>
+      </div>
+      <div class="col-add">
+        <input type="text" placeholder="+ small todo" data-add="todo-sm" />
+      </div>
+      <ul class="list" data-list="todo-sm"></ul>
+    </section>
+
+    <section class="col" data-col="todo-lg">
+      <div class="col-head">
+        <h2><span class="dot"></span>Todo · lg</h2>
+        <span class="count" data-count="todo-lg">0</span>
+      </div>
+      <div class="col-add">
+        <input type="text" placeholder="+ large todo" data-add="todo-lg" />
+      </div>
+      <ul class="list" data-list="todo-lg"></ul>
+    </section>
+
+    <section class="col" data-col="in-progress">
+      <div class="col-head">
+        <h2><span class="dot"></span>In progress</h2>
+        <span class="count" data-count="in-progress">0</span>
+      </div>
+      <div class="col-add">
+        <input type="text" placeholder="+ working on" data-add="in-progress" />
+      </div>
+      <ul class="list" data-list="in-progress"></ul>
+    </section>
+
+    <section class="col" data-col="follow-up">
+      <div class="col-head">
+        <h2><span class="dot"></span>Follow up</h2>
+        <span class="count" data-count="follow-up">0</span>
+      </div>
+      <div class="col-add">
+        <input type="text" placeholder="+ waiting on" data-add="follow-up" />
+      </div>
+      <ul class="list" data-list="follow-up"></ul>
+    </section>
+
+    <section class="col" data-col="done">
+      <div class="col-head">
+        <h2><span class="dot"></span>Done</h2>
+        <span class="count" data-count="done">0</span>
+      </div>
+      <div class="col-add">
+        <input type="text" placeholder="+ shipped" data-add="done" />
+      </div>
+      <ul class="list" data-list="done"></ul>
+    </section>
+  </main>
+
+  <footer class="tips">
+    <span>drag to move</span>
+    <span>double-click card to edit</span>
+    <span><kbd>Enter</kbd> in input to add</span>
+    <span>autosaved locally</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "kanban.board.v1";
+  const COLUMNS = ["todo-sm", "todo-lg", "in-progress", "follow-up", "done"];
+  const COL_LABELS = {
+    "todo-sm": "sm",
+    "todo-lg": "lg",
+    "in-progress": "progress",
+    "follow-up": "follow-up",
+    "done": "done"
+  };
+
+  const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+
+  const seed = () => ({
+    "todo-sm": [
+      { id: uid(), text: "Reply to Amy re: office hours", created: Date.now() },
+      { id: uid(), text: "Update password manager", created: Date.now() }
+    ],
+    "todo-lg": [
+      { id: uid(), text: "Draft Q3 planning doc — 3 sections, review with Sam", created: Date.now() }
+    ],
+    "in-progress": [
+      { id: uid(), text: "Onboarding video edits (v2)", created: Date.now() }
+    ],
+    "follow-up": [
+      { id: uid(), text: "Waiting on legal — vendor contract redlines", created: Date.now() }
+    ],
+    "done": [
+      { id: uid(), text: "Board deck sent", created: Date.now() }
+    ]
+  });
+
+  const load = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return seed();
+      const parsed = JSON.parse(raw);
+      const out = {};
+      for (const c of COLUMNS) out[c] = Array.isArray(parsed[c]) ? parsed[c] : [];
+      return out;
+    } catch (e) {
+      return seed();
+    }
+  };
+
+  const save = (state) => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  };
+
+  let state = load();
+  let dragging = null;
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  function render() {
+    let openCount = 0, doneCount = 0, ipCount = 0;
+
+    for (const col of COLUMNS) {
+      const list = $(`[data-list="${col}"]`);
+      list.innerHTML = "";
+      const items = state[col];
+      $(`[data-count="${col}"]`).textContent = items.length;
+
+      if (col === "done") doneCount = items.length;
+      else if (col === "in-progress") { ipCount = items.length; openCount += items.length; }
+      else openCount += items.length;
+
+      if (items.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "— drop or add —";
+        list.appendChild(empty);
+        continue;
+      }
+
+      for (const item of items) {
+        list.appendChild(cardEl(item, col));
+      }
+    }
+
+    $("#stat-open").textContent = openCount;
+    $("#stat-progress").textContent = ipCount;
+    $("#stat-done").textContent = doneCount;
+  }
+
+  function cardEl(item, col) {
+    const li = document.createElement("li");
+    li.className = "card";
+    li.draggable = true;
+    li.dataset.id = item.id;
+    li.dataset.col = col;
+
+    const text = document.createElement("div");
+    text.className = "text";
+    text.textContent = item.text;
+    li.appendChild(text);
+
+    const metaRow = document.createElement("div");
+    metaRow.className = "meta-row";
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = COL_LABELS[col];
+    const when = document.createElement("span");
+    when.textContent = formatWhen(item.created);
+    metaRow.appendChild(tag);
+    metaRow.appendChild(when);
+    li.appendChild(metaRow);
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.setAttribute("aria-label", "Delete card");
+    del.textContent = "×";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state[col] = state[col].filter(c => c.id !== item.id);
+      save(state); render();
+    });
+    li.appendChild(del);
+
+    li.addEventListener("dragstart", (e) => {
+      dragging = { id: item.id, from: col };
+      li.classList.add("dragging");
+      try { e.dataTransfer.setData("text/plain", item.id); } catch (_) {}
+      e.dataTransfer.effectAllowed = "move";
+    });
+    li.addEventListener("dragend", () => {
+      li.classList.remove("dragging");
+      dragging = null;
+      $$(".list.drop-target").forEach(l => l.classList.remove("drop-target"));
+    });
+
+    li.addEventListener("dblclick", () => {
+      text.setAttribute("contenteditable", "true");
+      text.focus();
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+    text.addEventListener("blur", () => {
+      if (text.getAttribute("contenteditable") !== "true") return;
+      text.removeAttribute("contenteditable");
+      const newText = text.textContent.trim();
+      if (!newText) {
+        state[col] = state[col].filter(c => c.id !== item.id);
+      } else {
+        const found = state[col].find(c => c.id === item.id);
+        if (found) found.text = newText;
+      }
+      save(state); render();
+    });
+    text.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); text.blur(); }
+      if (e.key === "Escape") { text.textContent = item.text; text.blur(); }
+    });
+
+    return li;
+  }
+
+  function formatWhen(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) {
+      return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
+    }
+    const diff = (now - d) / (1000 * 60 * 60 * 24);
+    if (diff < 7) return d.toLocaleDateString([], { weekday: "short" }).toLowerCase();
+    return d.toLocaleDateString([], { month: "short", day: "numeric" }).toLowerCase();
+  }
+
+  // Wire inputs
+  $$("[data-add]").forEach(input => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const val = input.value.trim();
+      if (!val) return;
+      const col = input.dataset.add;
+      state[col].unshift({ id: uid(), text: val, created: Date.now() });
+      input.value = "";
+      save(state); render();
+    });
+  });
+
+  // Wire drop targets
+  $$("[data-list]").forEach(list => {
+    const col = list.dataset.list;
+    list.addEventListener("dragover", (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      list.classList.add("drop-target");
+    });
+    list.addEventListener("dragleave", (e) => {
+      if (e.target === list) list.classList.remove("drop-target");
+    });
+    list.addEventListener("drop", (e) => {
+      e.preventDefault();
+      list.classList.remove("drop-target");
+      if (!dragging) return;
+      const { id, from } = dragging;
+      if (from === col) {
+        // reorder within same column based on drop position
+        const items = state[col];
+        const idx = items.findIndex(c => c.id === id);
+        if (idx < 0) return;
+        const [moved] = items.splice(idx, 1);
+        const dropIdx = getDropIndex(list, e.clientY);
+        items.splice(dropIdx, 0, moved);
+      } else {
+        const item = state[from].find(c => c.id === id);
+        if (!item) return;
+        state[from] = state[from].filter(c => c.id !== id);
+        const dropIdx = getDropIndex(list, e.clientY);
+        state[col].splice(dropIdx, 0, item);
+      }
+      save(state); render();
+    });
+  });
+
+  function getDropIndex(list, y) {
+    const cards = $$(".card", list);
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) return i;
+    }
+    return cards.length;
+  }
+
+  // Clear done
+  $("#clear-done").addEventListener("click", () => {
+    if (state.done.length === 0) return;
+    if (!confirm(`Remove ${state.done.length} card${state.done.length === 1 ? "" : "s"} from Done?`)) return;
+    state.done = [];
+    save(state); render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
