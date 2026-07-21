@@ -169,21 +169,6 @@
   .meta button:hover { color: var(--ink); border-color: var(--ink); }
   .meta button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-  .meta .search {
-    background: transparent;
-    border: 1px solid var(--line-strong);
-    border-radius: 4px;
-    padding: 4px 9px;
-    font-family: var(--mono);
-    font-size: 11.5px;
-    letter-spacing: 0.02em;
-    color: var(--ink);
-    width: 150px;
-    transition: border-color .15s, width .15s;
-  }
-  .meta .search::placeholder { color: var(--muted); }
-  .meta .search:focus { outline: none; border-color: var(--focus); width: 200px; }
-
   main.board {
     display: grid;
     grid-template-columns: repeat(5, minmax(240px, 1fr));
@@ -380,57 +365,6 @@
   .card:focus-within .del { opacity: 1; }
   .card .del:hover { background: var(--line); color: var(--ink); }
 
-  .card .due-btn {
-    background: transparent;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-family: var(--mono);
-    font-size: 10.5px;
-    letter-spacing: 0.04em;
-    padding: 0;
-  }
-  .card .due-btn:hover { color: var(--ink); text-decoration: underline; }
-  .card.overdue { border-color: #B04A4A; }
-  .card .due.overdue-text { color: #B04A4A; font-weight: 600; }
-
-  .card.search-hide { display: none; }
-  .card.search-match { border-color: var(--focus); }
-
-  .toast {
-    position: fixed;
-    bottom: 22px;
-    left: 50%;
-    transform: translateX(-50%) translateY(8px);
-    background: var(--ink);
-    color: var(--ground);
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.02em;
-    padding: 10px 14px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px -10px rgba(0,0,0,0.4);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .18s, transform .18s;
-    z-index: 50;
-  }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-  .toast button {
-    background: transparent;
-    border: 1px solid var(--ground);
-    color: var(--ground);
-    border-radius: 4px;
-    padding: 3px 8px;
-    font-family: var(--mono);
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .toast button:hover { background: var(--ground); color: var(--ink); }
-
   .empty {
     color: var(--muted);
     font-family: var(--mono);
@@ -478,18 +412,12 @@
       <h1><span class="subj">board</span><span class="sep">/</span>today</h1>
     </div>
     <div class="meta">
-      <input type="text" id="search" class="search" placeholder="search cards…" aria-label="Search cards" />
-      <span class="divider"></span>
       <span class="stat"><b id="stat-open">0</b> open</span>
       <span class="divider"></span>
       <span class="stat"><b id="stat-progress">0</b> in progress</span>
       <span class="divider"></span>
       <span class="stat"><b id="stat-done">0</b> done</span>
       <span class="divider"></span>
-      <button id="theme-toggle" title="Toggle light/dark theme">theme</button>
-      <button id="export-board" title="Export board as JSON">export</button>
-      <button id="import-board" title="Import board from JSON">import</button>
-      <input type="file" id="import-file" accept="application/json" hidden />
       <button id="clear-done" title="Remove all cards in Done">clear done</button>
     </div>
   </header>
@@ -559,15 +487,9 @@
   </footer>
 </div>
 
-<div class="toast" id="toast" role="status" aria-live="polite">
-  <span id="toast-msg"></span>
-  <button id="toast-undo">Undo</button>
-</div>
-
 <script>
 (() => {
   const STORAGE_KEY = "kanban.board.v1";
-  const THEME_KEY = "kanban.theme.v1";
   const COLUMNS = ["todo-sm", "todo-lg", "in-progress", "follow-up", "done"];
   const COL_LABELS = {
     "todo-sm": "sm",
@@ -617,26 +539,9 @@
 
   let state = load();
   let dragging = null;
-  let lastDeleted = null; // { item, col, index }
-  let toastTimer = null;
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-
-  // --- Theme ---
-  function applyTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
-  }
-  function initTheme() {
-    let theme;
-    try { theme = localStorage.getItem(THEME_KEY); } catch (e) {}
-    if (!theme) {
-      theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-    applyTheme(theme);
-  }
-  initTheme();
 
   function render() {
     let openCount = 0, doneCount = 0, ipCount = 0;
@@ -667,7 +572,6 @@
     $("#stat-open").textContent = openCount;
     $("#stat-progress").textContent = ipCount;
     $("#stat-done").textContent = doneCount;
-    applySearchFilter();
   }
 
   function cardEl(item, col) {
@@ -676,9 +580,6 @@
     li.draggable = true;
     li.dataset.id = item.id;
     li.dataset.col = col;
-
-    const isOverdue = item.due && item.due < todayStr() && col !== "done";
-    if (isOverdue) li.classList.add("overdue");
 
     const text = document.createElement("div");
     text.className = "text";
@@ -692,30 +593,7 @@
     tag.textContent = COL_LABELS[col];
     const when = document.createElement("span");
     when.textContent = formatWhen(item.created);
-
-    const dueBtn = document.createElement("button");
-    dueBtn.className = "due-btn";
-    dueBtn.type = "button";
-    dueBtn.textContent = item.due ? `due ${item.due}` : "+ due";
-    if (isOverdue) dueBtn.classList.add("overdue-text");
-    dueBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const input = document.createElement("input");
-      input.type = "date";
-      input.value = item.due || "";
-      input.className = "due-picker";
-      dueBtn.replaceWith(input);
-      input.focus();
-      const commit = () => {
-        item.due = input.value || null;
-        save(state); render();
-      };
-      input.addEventListener("change", commit);
-      input.addEventListener("blur", commit);
-    });
-
     metaRow.appendChild(tag);
-    metaRow.appendChild(dueBtn);
     metaRow.appendChild(when);
     li.appendChild(metaRow);
 
@@ -725,12 +603,8 @@
     del.textContent = "×";
     del.addEventListener("click", (e) => {
       e.stopPropagation();
-      const idx = state[col].findIndex(c => c.id === item.id);
-      if (idx < 0) return;
-      const [removed] = state[col].splice(idx, 1);
-      lastDeleted = { item: removed, col, index: idx };
+      state[col] = state[col].filter(c => c.id !== item.id);
       save(state); render();
-      showToast("Card deleted", true);
     });
     li.appendChild(del);
 
@@ -785,33 +659,6 @@
     const diff = (now - d) / (1000 * 60 * 60 * 24);
     if (diff < 7) return d.toLocaleDateString([], { weekday: "short" }).toLowerCase();
     return d.toLocaleDateString([], { month: "short", day: "numeric" }).toLowerCase();
-  }
-
-  function todayStr() {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  function showToast(message, withUndo) {
-    const toast = $("#toast");
-    $("#toast-msg").textContent = message;
-    $("#toast-undo").style.display = withUndo ? "" : "none";
-    toast.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 5000);
-  }
-
-  function applySearchFilter() {
-    const q = ($("#search").value || "").trim().toLowerCase();
-    $$(".card").forEach(card => {
-      card.classList.remove("search-hide", "search-match");
-      if (!q) return;
-      const text = card.querySelector(".text").textContent.toLowerCase();
-      if (text.includes(q)) {
-        card.classList.add("search-match");
-      } else {
-        card.classList.add("search-hide");
-      }
-    });
   }
 
   // Wire inputs
@@ -878,62 +725,6 @@
     if (!confirm(`Remove ${state.done.length} card${state.done.length === 1 ? "" : "s"} from Done?`)) return;
     state.done = [];
     save(state); render();
-  });
-
-  // Theme toggle
-  $("#theme-toggle").addEventListener("click", () => {
-    const current = document.documentElement.getAttribute("data-theme") || "light";
-    applyTheme(current === "dark" ? "light" : "dark");
-  });
-
-  // Search / filter
-  $("#search").addEventListener("input", applySearchFilter);
-
-  // Export board
-  $("#export-board").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `kanban-board-${todayStr()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
-
-  // Import board
-  $("#import-board").addEventListener("click", () => $("#import-file").click());
-  $("#import-file").addEventListener("change", (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result);
-        const out = {};
-        for (const c of COLUMNS) out[c] = Array.isArray(parsed[c]) ? parsed[c] : [];
-        state = out;
-        save(state); render();
-        showToast("Board imported", false);
-      } catch (err) {
-        showToast("Import failed: invalid JSON file", false);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  });
-
-  // Undo delete
-  $("#toast-undo").addEventListener("click", () => {
-    if (!lastDeleted) return;
-    const { item, col, index } = lastDeleted;
-    const items = state[col];
-    const insertAt = Math.min(index, items.length);
-    items.splice(insertAt, 0, item);
-    lastDeleted = null;
-    save(state); render();
-    $("#toast").classList.remove("show");
   });
 
   render();
