@@ -169,6 +169,110 @@
   .meta button:hover { color: var(--ink); border-color: var(--ink); }
   .meta button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
+  .meta input#search {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 4px 9px;
+    width: 140px;
+    transition: border-color .15s, width .15s;
+  }
+  .meta input#search::placeholder { color: var(--muted); }
+  .meta input#search:focus { outline: none; border-color: var(--focus); width: 200px; }
+
+  .card.search-hidden { display: none; }
+  .card mark {
+    background: color-mix(in srgb, var(--c-ip) 45%, transparent);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  .card .due-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card .due-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px dashed var(--line-strong);
+    border-radius: 4px;
+    padding: 2px 6px;
+    cursor: pointer;
+  }
+  .card .due-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+  .card .due-btn.set { border-style: solid; }
+  .card.overdue { border-color: #b5544a; }
+  .card.overdue .due-btn.set { color: #b5544a; border-color: #b5544a; }
+  .card .due-input {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 1px 4px;
+  }
+  .card .due-clear {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0 2px;
+  }
+  .card .due-clear:hover { color: var(--ink); }
+
+  #import-file { display: none; }
+
+  #toast-wrap {
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 50;
+  }
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--ink);
+    color: var(--ground);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 9px 12px 9px 14px;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px -10px rgba(0,0,0,0.4);
+    animation: toast-in .15s ease-out;
+  }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .toast button {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ground);
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--ground) 40%, transparent);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+  }
+  .toast button:hover { border-color: var(--ground); }
+
   main.board {
     display: grid;
     grid-template-columns: repeat(5, minmax(240px, 1fr));
@@ -412,12 +516,18 @@
       <h1><span class="subj">board</span><span class="sep">/</span>today</h1>
     </div>
     <div class="meta">
+      <input type="search" id="search" placeholder="search cards…" aria-label="Search cards" />
+      <span class="divider"></span>
       <span class="stat"><b id="stat-open">0</b> open</span>
       <span class="divider"></span>
       <span class="stat"><b id="stat-progress">0</b> in progress</span>
       <span class="divider"></span>
       <span class="stat"><b id="stat-done">0</b> done</span>
       <span class="divider"></span>
+      <button id="theme-toggle" title="Toggle light/dark theme">theme</button>
+      <button id="export-btn" title="Export board as JSON">export</button>
+      <button id="import-btn" title="Import board from JSON">import</button>
+      <input type="file" id="import-file" accept="application/json" />
       <button id="clear-done" title="Remove all cards in Done">clear done</button>
     </div>
   </header>
@@ -487,9 +597,12 @@
   </footer>
 </div>
 
+<div id="toast-wrap"></div>
+
 <script>
 (() => {
   const STORAGE_KEY = "kanban.board.v1";
+  const THEME_KEY = "kanban.theme";
   const COLUMNS = ["todo-sm", "todo-lg", "in-progress", "follow-up", "done"];
   const COL_LABELS = {
     "todo-sm": "sm",
@@ -539,12 +652,33 @@
 
   let state = load();
   let dragging = null;
+  let searchQuery = "";
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  function isOverdue(item, col) {
+    if (!item.due || col === "done") return false;
+    const due = new Date(item.due + "T23:59:59");
+    return due.getTime() < Date.now();
+  }
+
+  function highlightMatch(text, query) {
+    if (!query) return document.createTextNode(text);
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return document.createTextNode(text);
+    const frag = document.createDocumentFragment();
+    frag.appendChild(document.createTextNode(text.slice(0, idx)));
+    const mark = document.createElement("mark");
+    mark.textContent = text.slice(idx, idx + query.length);
+    frag.appendChild(mark);
+    frag.appendChild(document.createTextNode(text.slice(idx + query.length)));
+    return frag;
+  }
+
   function render() {
     let openCount = 0, doneCount = 0, ipCount = 0;
+    const query = searchQuery.trim().toLowerCase();
 
     for (const col of COLUMNS) {
       const list = $(`[data-list="${col}"]`);
@@ -564,8 +698,19 @@
         continue;
       }
 
+      let anyVisible = false;
       for (const item of items) {
-        list.appendChild(cardEl(item, col));
+        const matches = !query || item.text.toLowerCase().includes(query);
+        if (matches) anyVisible = true;
+        const el = cardEl(item, col, query);
+        if (!matches) el.classList.add("search-hidden");
+        list.appendChild(el);
+      }
+      if (query && !anyVisible) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "— no matches —";
+        list.appendChild(empty);
       }
     }
 
@@ -574,16 +719,17 @@
     $("#stat-done").textContent = doneCount;
   }
 
-  function cardEl(item, col) {
+  function cardEl(item, col, query) {
     const li = document.createElement("li");
     li.className = "card";
+    if (isOverdue(item, col)) li.classList.add("overdue");
     li.draggable = true;
     li.dataset.id = item.id;
     li.dataset.col = col;
 
     const text = document.createElement("div");
     text.className = "text";
-    text.textContent = item.text;
+    text.appendChild(highlightMatch(item.text, query));
     li.appendChild(text);
 
     const metaRow = document.createElement("div");
@@ -597,14 +743,54 @@
     metaRow.appendChild(when);
     li.appendChild(metaRow);
 
+    const dueRow = document.createElement("div");
+    dueRow.className = "due-row";
+    const dueBtn = document.createElement("button");
+    dueBtn.className = "due-btn" + (item.due ? " set" : "");
+    dueBtn.textContent = item.due ? `due ${item.due}` : "+ due date";
+    dueBtn.title = "Set due date";
+    dueBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const input = document.createElement("input");
+      input.type = "date";
+      input.className = "due-input";
+      if (item.due) input.value = item.due;
+      dueRow.replaceChild(input, dueBtn);
+      input.focus();
+      try { input.showPicker && input.showPicker(); } catch (_) {}
+      const commit = () => {
+        item.due = input.value || null;
+        save(state); render();
+      };
+      input.addEventListener("change", commit);
+      input.addEventListener("blur", commit);
+    });
+    dueRow.appendChild(dueBtn);
+    if (item.due) {
+      const clearBtn = document.createElement("button");
+      clearBtn.className = "due-clear";
+      clearBtn.textContent = "×";
+      clearBtn.title = "Clear due date";
+      clearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        item.due = null;
+        save(state); render();
+      });
+      dueRow.appendChild(clearBtn);
+    }
+    li.appendChild(dueRow);
+
     const del = document.createElement("button");
     del.className = "del";
     del.setAttribute("aria-label", "Delete card");
     del.textContent = "×";
     del.addEventListener("click", (e) => {
       e.stopPropagation();
-      state[col] = state[col].filter(c => c.id !== item.id);
+      const idx = state[col].findIndex(c => c.id === item.id);
+      if (idx < 0) return;
+      const [removed] = state[col].splice(idx, 1);
       save(state); render();
+      showUndoToast(removed, col, idx);
     });
     li.appendChild(del);
 
@@ -725,6 +911,90 @@
     if (!confirm(`Remove ${state.done.length} card${state.done.length === 1 ? "" : "s"} from Done?`)) return;
     state.done = [];
     save(state); render();
+  });
+
+  // Undo toast
+  function showUndoToast(item, col, idx) {
+    const wrap = $("#toast-wrap");
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    const msg = document.createElement("span");
+    msg.textContent = "Card deleted";
+    const undoBtn = document.createElement("button");
+    undoBtn.textContent = "Undo";
+    let timer = setTimeout(() => toast.remove(), 5000);
+    undoBtn.addEventListener("click", () => {
+      clearTimeout(timer);
+      const items = state[col];
+      const at = Math.min(idx, items.length);
+      items.splice(at, 0, item);
+      save(state); render();
+      toast.remove();
+    });
+    toast.appendChild(msg);
+    toast.appendChild(undoBtn);
+    wrap.appendChild(toast);
+  }
+
+  // Theme toggle
+  function applyTheme(theme) {
+    if (theme === "light" || theme === "dark") {
+      document.documentElement.setAttribute("data-theme", theme);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  }
+  function initTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    applyTheme(saved);
+  }
+  $("#theme-toggle").addEventListener("click", () => {
+    const current = localStorage.getItem(THEME_KEY) ||
+      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const next = current === "dark" ? "light" : "dark";
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+  });
+  initTheme();
+
+  // Search/filter
+  $("#search").addEventListener("input", (e) => {
+    searchQuery = e.target.value;
+    render();
+  });
+
+  // Export / import
+  $("#export-btn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `kanban-board-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  $("#import-btn").addEventListener("click", () => $("#import-file").click());
+  $("#import-file").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const out = {};
+        for (const c of COLUMNS) out[c] = Array.isArray(parsed[c]) ? parsed[c] : [];
+        state = out;
+        save(state); render();
+      } catch (err) {
+        alert("Could not import file: invalid JSON.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   });
 
   render();
